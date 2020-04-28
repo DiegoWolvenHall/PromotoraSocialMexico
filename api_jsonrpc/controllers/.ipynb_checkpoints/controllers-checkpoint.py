@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from odoo import http
 from odoo.http import Controller, request
+from odoo.addons import base
 
 class ApiJsonrpc(http.Controller):
     @http.route('/api/auth', type='json', auth='none', methods=["POST"])
@@ -21,46 +22,136 @@ class ApiJsonrpc(http.Controller):
         data = {'status': 200, 'response': contacts, 'message': 'Success'}
         return data
     
-    @http.route('/api/create_partner', type='json', auth='user')
-    def create_contacts(self, **rec):
-        global response
+    @http.route('/api/create_company', type='json', auth='user')
+    def create_company(self, **rec):
+
+        global response, id_country, id_state
+
         if request.jsonrequest:
-            
-            if rec['name'] and rec['vat']:
+            if rec['name']:
+
+                if rec['country']:
+                    id_country = request.env['res.country'].search([('name', '=', rec['country'])], limit=1).id
+                    if id_country is None:
+                        id_country = ''
+
+                if rec['state']:
+                    id_state = request.env['res.country.state'].search([('name', '=', rec['state'])], limit=1).id
+                    if id_state is None:
+                        id_state = ''
+
                 vals = {
                     'name': rec['name'],
-                    'vat': rec['vat'],
+                    'vat': rec['rfc'],
                     'website': rec['website'],
                     'street': rec['street'],
                     'street2': rec['street2'],
                     'zip': rec['zip'],
                     'city': rec['city'],
-                    'state_id': rec['state_id'],
+                    'country_id': id_country,
+                    'state_id': id_state,
                     'email': rec['email'],
                     'phone': rec['phone'],
                     'mobile': rec['mobile'],
-                    'is_company': rec['is_company']
+                    'is_company': 'true'
                 }
+
                 try:
+
+                    # 1. Insert new Partner
                     new_contact = request.env['res.partner'].sudo().create(vals)
+
+                    # 2. Search Tag
+                    id_category = request.env['res.partner.category'].search([('name', '=', 'Asociada')], limit=1).id
+
+                    # 3. If category exist
+                    if id_category > 0:
+                        request.cr.execute("""insert into res_partner_res_partner_category_rel(category_id,partner_id) 
+                                           values(""" + str(id_category) + """,""" + str(new_contact.id) + """)""")
+                    # 4. If not exist else create tag
+                    else:
+                        category = {'name': 'Asociada'}
+                        request.env['res.partner.category'].sudo().create(category)
+
                     response = {'success': True, 'message': 'Success', 'ID': new_contact.id}
+
                 except ValueError:
                     print(ValueError)
-                    response = {'success': True, 'message': 'Error al insertar valores'}
-            else:
-                response = {'success': True, 'message': 'Faltan valores'}
-        args = response
-        return args           
-                        
-#     @http.route('/api_jsonrpc/api_jsonrpc/objects/', auth='public')
-#     def list(self, **kw):
-#         return http.request.render('api_jsonrpc.listing', {
-#             'root': '/api_jsonrpc/api_jsonrpc',
-#             'objects': http.request.env['api_jsonrpc.api_jsonrpc'].search([]),
-#         })
+                    response = {'success': True, 'message': ValueError}
 
-#     @http.route('/api_jsonrpc/api_jsonrpc/objects/<model("api_jsonrpc.api_jsonrpc"):obj>/', auth='public')
-#     def object(self, obj, **kw):
-#         return http.request.render('api_jsonrpc.object', {
-#             'object': obj
-#         })
+            else:
+                response = {'success': True, 'message': 'Incomplete values'}
+
+        args = response
+        return args
+
+    @http.route('/api/create_contact', type='json', auth='user')
+    def create_contact(self, **rec):
+
+        global response, id_company, id_country, id_state
+
+        if request.jsonrequest:
+            if rec['name']:
+                if rec['company']:
+                    id_company = request.env['res.partner'].search([('name', 'ilike', rec['company'])], limit=1).id
+                    if id_company is False:
+                        id_company = ''
+
+                if rec['country']:
+                    id_country = request.env['res.country'].search([('name', '=', rec['country'])], limit=1).id
+                    if id_country is None:
+                        id_country = ''
+
+                if rec['state']:
+                    id_state = request.env['res.country.state'].search([('name', '=', rec['state'])], limit=1).id
+                    if id_state is None:
+                        id_state = ''
+
+                vals = {
+                    'name': rec['name'],
+                    'vat': rec['rfc'],
+                    'website': rec['website'],
+                    'street': rec['street'],
+                    'street2': rec['street2'],
+                    'zip': rec['zip'],
+                    'city': rec['city'],
+                    'country_id': id_country,
+                    'state_id': id_state,
+                    'email': rec['email'],
+                    'phone': rec['phone'],
+                    'mobile': rec['mobile'],
+                    'is_company': 'false',
+                    'parent_id': id_company
+                }
+
+                try:
+
+                    # 1. Insert new Partner
+                    new_contact = request.env['res.partner'].sudo().create(vals)
+
+                    # 2. Search Tag
+                    id_category = request.env['res.partner.category'].search([('name', '=', 'Asociada')], limit=1).id
+
+                    # 3. If category exist
+                    if id_category > 0:
+                        request.cr.execute("""insert into res_partner_res_partner_category_rel(category_id,partner_id) 
+                                                   values(""" + str(id_category) + """,""" + str(
+                            new_contact.id) + """)""")
+                    # 4. If not exist else create tag
+                    else:
+                        category = {'name': 'Asociada'}
+                        request.env['res.partner.category'].sudo().create(category)
+
+                    response = {'success': True, 'message': 'Success', 'ID': new_contact.id}
+
+                except ValueError:
+                    print(ValueError)
+                    response = {'success': True, 'message': ValueError}
+
+            else:
+                response = {'success': True, 'message': 'Incomplete values'}
+
+            args = response
+            return args
+
+                   
