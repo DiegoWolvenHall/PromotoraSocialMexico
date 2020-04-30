@@ -137,6 +137,7 @@ class ApiJsonrpc(http.Controller):
                         request.cr.execute("""insert into res_partner_res_partner_category_rel(category_id,partner_id) 
                                                    values(""" + str(id_category) + """,""" + str(
                             new_contact.id) + """)""")
+                        
                     # 4. If not exist else create tag
                     else:
                         category = {'name': 'Asociada'}
